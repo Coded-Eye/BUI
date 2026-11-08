@@ -19,6 +19,8 @@ endif()
 
 add_custom_command(
     OUTPUT "${BINDGEN_EXE}"
+    COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/bindings/odin/windows/libclang.dll" "${ODIN_BINDGEN_SRC_DIR}/libclang.dll"
+    COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/bindings/odin/windows/libclang.lib" "${ODIN_BINDGEN_SRC_DIR}/libclang/libclang.lib"
     COMMAND odin build ${ODIN_BINDGEN_SRC_DIR}/src -out:${BINDGEN_EXE}
     WORKING_DIRECTORY "${ODIN_BINDGEN_SRC_DIR}"
     COMMENT "Compiling automatically fetched odin-c-bindgen tool..."
@@ -46,19 +48,61 @@ file(WRITE "${SJSON_FILE}" "${SJSON_CONTENT}")
 
 set(ODIN_LIB_FILE "${ODIN_OUTPUT_DIR}/libs.odin")
 set(IMPORT_CONTENT
-"@(extra_linker_flags=\"-Wl,--start-group -lstdc++ -Wl,--end-group\")
-foreign import lib {
-\t\"./libbui_kit.a\",
-\t\"./libbui_core.a\",
-\t\"./libbui_compat.a\",
-\t\"./libbui_api.a\",
-\t\"./libbui_gpu.a\",
+"when ODIN_OS == .Windows {
+	@(extra_linker_flags=\"/NODEFAULTLIB:libcpmtd /NODEFAULTLIB:libcmtd /NODEFAULTLIB:libcpmt /NODEFAULTLIB:libcmt\")
+	foreign import lib {
+		\"./bui_kit.lib\",
+		\"./bui_core.lib\",
+		\"./bui_compat.lib\",
+		\"./bui_api.lib\",
+		\"./bui_gpu.lib\",
+
+		\"system:msvcprtd.lib\", // Standard C++ Library (DLL - Debug)
+		\"system:vcruntimed.lib\",// Visual C++ Runtime (DLL - Debug)
+		\"system:ucrtd.lib\",    // Universal C Runtime (DLL - Debug)
+
+		\"system:user32.lib\",     // Windowing, cursors, inputs, messages
+		\"system:gdi32.lib\",      // Device contexts, fonts, basic graphics
+		\"system:kernel32.lib\",   // Core OS services (threads, memory, file I/O)
+		\"system:comctl32.lib\",   // Native extended UI controls and event tracking
+		\"system:shell32.lib\",    // Shell API (folders, drag & drop)
+		\"system:ole32.lib\",      // COM/OLE component initialization
+		\"system:uuid.lib\",       // Globally Unique Identifiers definitions
+		\"system:advapi32.lib\",   // Registry management and security APIs
+		\"system:shlwapi.lib\",    // Shell Lightweight API (string processing, paths)
+		\"system:winmm.lib\",      // Windows Multimedia API (high-resolution timers)
+
+	}
+} else when ODIN_OS == .Linux {
+	@(extra_linker_flags=\"-Wl,--start-group -lstdc++ -Wl,--end-group\")
+	foreign import lib {
+		\"./libbui_kit.a\",
+		\"./libbui_core.a\",
+		\"./libbui_compat.a\",
+		\"./libbui_api.a\",
+		\"./libbui_gpu.a\",
+	}
 }"
 )
 file(WRITE "${ODIN_LIB_FILE}" "${IMPORT_CONTENT}")
 
 set(FINAL_LIB_ODIN "${ODIN_OUTPUT_DIR}/BUI/BUI_kit.odin")
 
+if(WIN32)
+add_custom_command(
+    OUTPUT "${FINAL_LIB_ODIN}"
+    COMMAND ${BINDGEN_EXE} "."
+    COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_BINARY_DIR}/gpu/Debug/bui_gpu.lib" "${ODIN_OUTPUT_DIR}/BUI/bui_gpu.lib"
+    COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_BINARY_DIR}/compat/Debug/bui_compat.lib" "${ODIN_OUTPUT_DIR}/BUI/bui_compat.lib"
+    COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_BINARY_DIR}/api/Debug/bui_api.lib" "${ODIN_OUTPUT_DIR}/BUI/bui_api.lib"
+    COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_BINARY_DIR}/core/Debug/bui_core.lib" "${ODIN_OUTPUT_DIR}/BUI/bui_core.lib"
+    COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_BINARY_DIR}/kit/Debug/bui_kit.lib" "${ODIN_OUTPUT_DIR}/BUI/bui_kit.lib"
+    DEPENDS "${BINDGEN_EXE}" "${ODIN_OUTPUT_DIR}/BUI_kit.h" "${SJSON_FILE}" "${ODIN_LIB_FILE}"
+    WORKING_DIRECTORY "${ODIN_OUTPUT_DIR}"
+    COMMENT "Generating active bindings and collecting required library files into BUI package folder..."
+    VERBATIM
+)
+else()
 add_custom_command(
     OUTPUT "${FINAL_LIB_ODIN}"
     COMMAND ${BINDGEN_EXE} "."
@@ -72,6 +116,7 @@ add_custom_command(
     COMMENT "Generating active bindings and collecting required library files into BUI package folder..."
     VERBATIM
 )
+endif()
 
 add_custom_target(bui_odin_bindings ALL
     DEPENDS "${FINAL_LIB_ODIN}"
