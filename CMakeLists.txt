@@ -150,6 +150,10 @@ if(BUI_BUILD_PYTHON_BINDINGS)
   add_subdirectory(bindings/python)
 endif()
 
+if(BUI_BUILD_ODIN_BINDINGS)
+  add_subdirectory(bindings/odin)
+endif()
+
 if(BUI_BUILD_LUA_BINDINGS)
   # the crates.io copy of the C sources (bindings/rust/scripts/vendor_c.py) has no bindings/lua
   if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/bindings/lua/CMakeLists.txt)
@@ -162,7 +166,6 @@ endif()
 if(BUI_BUILD_QT_BACKEND)
   add_subdirectory(backends/qt)
 endif()
-
 
 if(BUI_BUILD_EXAMPLES)
   add_subdirectory(examples)
